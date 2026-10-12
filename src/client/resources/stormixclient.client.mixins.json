@@ -1,0 +1,13 @@
+{
+	"required": true,
+	"package": "dev.stormix.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [],
+	"client": [
+		"PlayerSkinMixin",
+		"LightmapMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

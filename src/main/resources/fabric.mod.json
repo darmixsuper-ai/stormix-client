@@ -3,16 +3,17 @@
 	"id": "stormixclient",
 	"version": "${version}",
 	"name": "Stormix Client",
-	"description": "Das Menue und die Module von Stormix Studio. Oeffnen mit Rechts-Shift.",
+	"description": "Menue, Module und Cosmetics von Stormix Studio. Oeffnen mit Rechts-Shift.",
 	"authors": ["Stormix"],
 	"license": "MIT",
 	"environment": "client",
+	"mixins": ["stormixclient.client.mixins.json"],
 	"entrypoints": {
 		"client": ["dev.stormix.client.StormixClient"]
 	},
 	"depends": {
 		"fabricloader": ">=0.19.5",
-		"minecraft": "~26.2",
+		"minecraft": "~${minecraft_version}",
 		"java": ">=25",
 		"fabric-api": "*"
 	}

@@ -9,6 +9,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 
 /** Das Stormix-Menue. Oeffnen und Schliessen mit Rechts-Shift. */
@@ -74,6 +75,18 @@ public class MenuScreen extends Screen {
 		return this.py + 46 + (i / 2) * 48 - (int) this.scroll;
 	}
 
+	private int capeW() {
+		return (this.pw - SIDEBAR - 24 - 24) / 4;
+	}
+
+	private int capeX(int i) {
+		return this.px + SIDEBAR + 12 + (i % 4) * (this.capeW() + 8);
+	}
+
+	private int capeY(int i) {
+		return this.py + 48 + (i / 4) * 100;
+	}
+
 	private int maxScroll(int count) {
 		int rows = (count + 1) / 2;
 		return Math.max(0, rows * 48 - (this.ph - 56));
@@ -135,13 +148,36 @@ public class MenuScreen extends Screen {
 			}
 			g.disableScissor();
 		} else if (this.tab == 1) {
-			g.text(mc.font, "Eigene Cosmetics kommen als Naechstes:", cx, this.py + 50, 0xFFFFFFFF, false);
-			g.text(mc.font, "Capes, Huete und Fluegel. Alle gratis.", cx, this.py + 66, 0xFF9692AD, false);
+			g.text(mc.font, "Capes", cx, this.py + 34, 0xFF9692AD, false);
+			for (int i = 0; i <= Capes.ALL.size(); i++) {
+				int x = this.capeX(i);
+				int y = this.capeY(i);
+				int w = this.capeW();
+				String id = i == 0 ? "" : Capes.ALL.get(i - 1).id();
+				boolean on = Capes.selected.equals(id);
+				boolean hover = mx >= x && mx < x + w && my >= y && my < y + 92;
+				g.fill(x, y, x + w, y + 92, hover ? 0x40FFFFFF : 0x28FFFFFF);
+				if (on) {
+					g.outline(x, y, w, 92, ACCENT);
+				}
+				if (i == 0) {
+					g.centeredText(mc.font, "Kein", x + w / 2, y + 28, 0xFFA09CB5);
+					g.centeredText(mc.font, "Cape", x + w / 2, y + 40, 0xFFA09CB5);
+				} else {
+					g.blit(RenderPipelines.GUI_TEXTURED, Capes.preview(id), x + (w - 30) / 2, y + 8, 1.0F, 1.0F, 30, 48, 10, 16, 64, 32);
+				}
+				String label = i == 0 ? "Aus" : Capes.ALL.get(i - 1).name();
+				g.centeredText(mc.font, label, x + w / 2, y + 68, on ? 0xFFFFFFFF : 0xFFC4C0D8);
+				if (on) {
+					g.centeredText(mc.font, "aktiv", x + w / 2, y + 80, ACCENT);
+				}
+			}
 		} else {
-			g.text(mc.font, "Stormix Client 0.1.0", cx, this.py + 50, 0xFFFFFFFF, false);
-			g.text(mc.font, "Rechts-Shift oeffnet und schliesst dieses Menue.", cx, this.py + 70, 0xFF9692AD, false);
-			g.text(mc.font, "Anzeigen verschieben: Menue offen lassen und die", cx, this.py + 86, 0xFF9692AD, false);
-			g.text(mc.font, "Anzeige ausserhalb des Menues mit der Maus ziehen.", cx, this.py + 98, 0xFF9692AD, false);
+			g.text(mc.font, "Stormix Client 0.2.0", cx, this.py + 50, 0xFFFFFFFF, false);
+			g.text(mc.font, "Cosmetics sieht nur du. Andere Spieler sehen sie nicht.", cx, this.py + 118, 0xFF9692AD, false);
+			g.text(mc.font, "Rechts-Shift öffnet und schliesst dieses Menü.", cx, this.py + 70, 0xFF9692AD, false);
+			g.text(mc.font, "Anzeigen verschieben: Menü offen lassen und die", cx, this.py + 86, 0xFF9692AD, false);
+			g.text(mc.font, "Anzeige ausserhalb des Menüs mit der Maus ziehen.", cx, this.py + 98, 0xFF9692AD, false);
 		}
 	}
 
@@ -180,6 +216,17 @@ public class MenuScreen extends Screen {
 				int y = this.cardY(i);
 				if (mx >= x && mx < x + this.cardW() && my >= y && my < y + 40) {
 					list.get(i).toggle(mc);
+					Modules.save();
+					return true;
+				}
+			}
+		}
+		if (this.tab == 1) {
+			for (int i = 0; i <= Capes.ALL.size(); i++) {
+				int x = this.capeX(i);
+				int y = this.capeY(i);
+				if (mx >= x && mx < x + this.capeW() && my >= y && my < y + 92) {
+					Capes.selected = i == 0 ? "" : Capes.ALL.get(i - 1).id();
 					Modules.save();
 					return true;
 				}

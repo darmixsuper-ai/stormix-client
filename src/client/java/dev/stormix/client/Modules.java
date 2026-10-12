@@ -16,14 +16,27 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 
 public final class Modules {
 	public static final List<HudModule> ALL = new ArrayList<>();
 
+	private static final long START = System.currentTimeMillis();
+
 	private Modules() {
+	}
+
+	public static boolean isOn(String id) {
+		for (HudModule m : ALL) {
+			if (m.id.equals(id)) {
+				return m.enabled;
+			}
+		}
+		return false;
 	}
 
 	static {
@@ -88,7 +101,7 @@ public final class Modules {
 				return "CPS: " + this.clicks.size();
 			}
 		});
-		ALL.add(new HudModule("keystrokes", "Tasten-Anzeige", "Zeigt WASD und die Maustasten, wenn du sie drueckst.", 4, 110, true) {
+		ALL.add(new HudModule("keystrokes", "Tasten-Anzeige", "Zeigt WASD und die Maustasten, wenn du sie drückst.", 4, 110, true) {
 			@Override
 			public int width(Minecraft mc) {
 				return 64;
@@ -114,7 +127,7 @@ public final class Modules {
 				this.key(g, mc, px + 33, py + 44, 31, 20, "RMB", mc.options.keyUse.isDown());
 			}
 		});
-		ALL.add(new HudModule("armor", "Ruestungs-Status", "Zeigt die Haltbarkeit deiner Ruestung an.", 4, 180, true) {
+		ALL.add(new HudModule("armor", "Rüstungs-Status", "Zeigt die Haltbarkeit deiner Rüstung an.", 4, 180, true) {
 			private final EquipmentSlot[] slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
 
 			@Override
@@ -146,6 +159,123 @@ public final class Modules {
 				}
 			}
 		});
+		ALL.add(new TextModule("day", "Tag-Zähler", "Zeigt, wie viele Minecraft-Tage diese Welt schon läuft.", 4, 100, false) {
+			@Override
+			protected String text(Minecraft mc) {
+				return mc.level == null ? "Tag: -" : "Tag: " + (mc.level.getGameTime() / 24000L + 1L);
+			}
+		});
+		ALL.add(new TextModule("uptime", "Spielzeit", "Zeigt, wie lange du schon im Spiel bist.", 4, 116, false) {
+			@Override
+			protected String text(Minecraft mc) {
+				long sec = (System.currentTimeMillis() - START) / 1000L;
+				return String.format(Locale.ROOT, "Online: %d:%02d:%02d", sec / 3600, (sec / 60) % 60, sec % 60);
+			}
+		});
+		ALL.add(new TextModule("ram", "Speicher", "Zeigt, wie viel Arbeitsspeicher das Spiel benutzt.", 4, 132, false) {
+			@Override
+			protected String text(Minecraft mc) {
+				Runtime r = Runtime.getRuntime();
+				return "RAM: " + ((r.totalMemory() - r.freeMemory()) / 1048576L) + " MB";
+			}
+		});
+		ALL.add(new TextModule("direction", "Richtung", "Zeigt, in welche Himmelsrichtung du schaust.", 4, 148, false) {
+			private final String[] names = {"Süd", "Südwest", "West", "Nordwest", "Nord", "Nordost", "Ost", "Südost"};
+
+			@Override
+			protected String text(Minecraft mc) {
+				if (mc.player == null) {
+					return "Richtung: -";
+				}
+				int i = Math.floorMod(Math.round(mc.player.getYRot() / 45.0F), 8);
+				return "Richtung: " + this.names[i];
+			}
+		});
+		ALL.add(new TextModule("light", "Lichtlevel", "Zeigt das Licht von Blöcken an deiner Position. Unter 8 spawnen Monster.", 4, 164, false) {
+			@Override
+			protected String text(Minecraft mc) {
+				if (mc.player == null || mc.level == null) {
+					return "Licht: -";
+				}
+				return "Licht: " + mc.level.getBrightness(LightLayer.BLOCK, mc.player.blockPosition());
+			}
+		});
+		ALL.add(new TextModule("saturation", "Sättigung", "Zeigt deine versteckte Sättigung. Wichtig fürs Heilen.", 4, 180, false) {
+			@Override
+			protected String text(Minecraft mc) {
+				if (mc.player == null) {
+					return "Sättigung: -";
+				}
+				return String.format(Locale.ROOT, "Sättigung: %.1f", mc.player.getFoodData().getSaturationLevel());
+			}
+		});
+		ALL.add(new TextModule("itemcount", "Item-Zähler", "Zählt, wie viele Stück vom Item in deiner Hand du insgesamt hast.", 4, 196, false) {
+			@Override
+			protected String text(Minecraft mc) {
+				if (mc.player == null) {
+					return "Items: -";
+				}
+				ItemStack held = mc.player.getInventory().getSelectedItem();
+				if (held.isEmpty()) {
+					return "Items: 0";
+				}
+				int n = 0;
+				for (int i = 0; i < mc.player.getInventory().getContainerSize(); i++) {
+					ItemStack s = mc.player.getInventory().getItem(i);
+					if (!s.isEmpty() && s.is(held.getItem())) {
+						n += s.getCount();
+					}
+				}
+				return "Items: " + n;
+			}
+		});
+		ALL.add(new HudModule("potions", "Trank-Status", "Zeigt deine aktiven Effekte mit Restzeit.", 4, 260, true) {
+			private List<String> lines(Minecraft mc) {
+				List<String> out = new ArrayList<>();
+				if (mc.player == null) {
+					return out;
+				}
+				for (MobEffectInstance e : mc.player.getActiveEffects()) {
+					String n = e.getEffect().value().getDisplayName().getString();
+					int lvl = e.getAmplifier() + 1;
+					int d = e.getDuration();
+					String t = d < 0 ? "∞" : String.format(Locale.ROOT, "%d:%02d", d / 1200, (d / 20) % 60);
+					out.add(n + (lvl > 1 ? " " + lvl : "") + "  " + t);
+				}
+				return out;
+			}
+
+			@Override
+			public int width(Minecraft mc) {
+				int w = 0;
+				for (String l : this.lines(mc)) {
+					w = Math.max(w, mc.font.width(l) + 8);
+				}
+				return w;
+			}
+
+			@Override
+			public int height(Minecraft mc) {
+				return this.lines(mc).size() * 13;
+			}
+
+			@Override
+			public void render(GuiGraphicsExtractor g, Minecraft mc, int px, int py) {
+				int i = 0;
+				for (String l : this.lines(mc)) {
+					int y = py + i * 13;
+					g.fill(px, y, px + mc.font.width(l) + 8, y + 12, 0x90000000);
+					g.text(mc.font, l, px + 4, y + 2, 0xFFFFFFFF, true);
+					i++;
+				}
+			}
+		});
+		ALL.add(new HudModule("fullbright", "Fullbright", "Macht alles hell, auch in Höhlen und nachts.", 0, 0, false) {
+			@Override
+			public boolean hasHud() {
+				return false;
+			}
+		});
 		ALL.add(new HudModule("zoom", "Zoom", "Halte die Taste C, um heranzuzoomen.", 0, 0, true) {
 			private Integer oldFov;
 
@@ -175,7 +305,7 @@ public final class Modules {
 				}
 			}
 		});
-		ALL.add(new HudModule("togglesprint", "Toggle Sprint", "Sprinten ohne die Taste gedrueckt zu halten.", 0, 0, false) {
+		ALL.add(new HudModule("togglesprint", "Toggle Sprint", "Sprinten ohne die Taste gedrückt zu halten.", 0, 0, false) {
 			@Override
 			public boolean hasHud() {
 				return false;
@@ -206,6 +336,9 @@ public final class Modules {
 				return;
 			}
 			JsonObject root = JsonParser.parseString(Files.readString(p)).getAsJsonObject();
+			if (root.has("_cape")) {
+				Capes.selected = root.get("_cape").getAsString();
+			}
 			for (HudModule m : ALL) {
 				if (root.has(m.id)) {
 					JsonObject o = root.getAsJsonObject(m.id);
@@ -222,6 +355,7 @@ public final class Modules {
 	public static void save() {
 		try {
 			JsonObject root = new JsonObject();
+			root.addProperty("_cape", Capes.selected);
 			for (HudModule m : ALL) {
 				JsonObject o = new JsonObject();
 				o.addProperty("enabled", m.enabled);

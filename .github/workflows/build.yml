@@ -9,6 +9,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mc: ['26.1.2', '26.2', '26.3']
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -22,26 +26,49 @@ jobs:
         id: build
         run: |
           set +e
-          gradle build --no-daemon --console=plain > /tmp/build.log 2>&1
+          API=$(curl -s https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml | python3 -c "
+          import sys,re
+          mc='${{ matrix.mc }}'
+          v=[x for x in re.findall(r'<version>([^<]+)</version>',sys.stdin.read()) if x.endswith('+'+mc)]
+          print(v[-1] if v else '')")
+          echo "API=$API" >> "$GITHUB_ENV"
+          if [ -z "$API" ]; then echo "keine Fabric API fuer ${{ matrix.mc }}" > /tmp/build.log; echo "code=2" >> "$GITHUB_OUTPUT"; exit 0; fi
+          gradle build --no-daemon --console=plain -Pminecraft_version=${{ matrix.mc }} -Pfabric_api_version=$API > /tmp/build.log 2>&1
           echo "code=$?" >> "$GITHUB_OUTPUT"
-      - name: Log veroeffentlichen
+      - name: Sammeln
         if: always()
         run: |
-          mkdir -p /tmp/lg && tail -300 /tmp/build.log > /tmp/lg/build.log
-          echo "exit=${{ steps.build.outputs.code }}" > /tmp/lg/status.txt
-          cd /tmp/lg
-          git init -q -b logs && git config user.name actions && git config user.email actions@users.noreply.github.com
-          git add . && git commit -qm "build log"
-          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" logs
-      - name: Release
-        if: steps.build.outputs.code == '0'
+          mkdir -p out
+          tail -200 /tmp/build.log > "out/build-${{ matrix.mc }}.log"
+          echo "exit=${{ steps.build.outputs.code }} api=$API" > "out/status-${{ matrix.mc }}.txt"
+          if [ "${{ steps.build.outputs.code }}" = "0" ]; then
+            JAR=$(ls build/libs/stormix-client-*.jar | grep -v sources | head -1)
+            cp "$JAR" "out/stormix-client-${{ matrix.mc }}.jar"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: out-${{ matrix.mc }}
+          path: out
+  release:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: all
+          pattern: out-*
+          merge-multiple: true
+      - name: Logs und Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          JAR=$(ls build/libs/*.jar | grep -v sources | head -1)
-          cp "$JAR" stormix-client.jar
-          gh release delete latest -y --cleanup-tag || true
-          gh release create latest stormix-client.jar --title "Stormix Client (neueste Version)" --notes "Wird automatisch gebaut."
-      - name: Fehlschlag melden
-        if: steps.build.outputs.code != '0'
-        run: exit 1
+          cd all
+          ls -la
+          mkdir /tmp/lg && cp *.log *.txt /tmp/lg/
+          (cd /tmp/lg && git init -q -b logs && git config user.name actions && git config user.email actions@users.noreply.github.com && git add . && git commit -qm logs && git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" logs)
+          if ls stormix-client-*.jar >/dev/null 2>&1; then
+            gh release delete latest -y --cleanup-tag --repo "${{ github.repository }}" || true
+            gh release create latest stormix-client-*.jar --repo "${{ github.repository }}" --target main --title "Stormix Client (neueste Version)" --notes "Wird automatisch gebaut."
+          fi

@@ -21,14 +21,17 @@ dependencies {
 
 processResources {
 	def version = project.version
+	def mcv = project.minecraft_version
 	inputs.property "version", version
+	inputs.property "minecraft_version", mcv
 	filesMatching("fabric.mod.json") {
-		expand "version": version
+		expand "version": version, "minecraft_version": mcv
 	}
 }
 
 tasks.withType(JavaCompile).configureEach {
 	it.options.release = 25
+	it.options.encoding = 'UTF-8'
 }
 
 java {
