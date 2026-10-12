@@ -1,0 +1,27 @@
+name: apisources
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/apisources.yml']
+permissions:
+  contents: write
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fabric API sources
+        run: |
+          mkdir -p /tmp/lg && cd /tmp/lg
+          B=https://maven.fabricmc.net/net/fabricmc/fabric-api
+          curl -s "$B/fabric-api/0.161.0+26.2/fabric-api-0.161.0+26.2.pom" -o pom.xml
+          python3 - <<'PY' > mods.txt
+          import re
+          t=open('pom.xml').read()
+          for a,v in re.findall(r'<artifactId>([^<]+)</artifactId>\s*<version>([^<]+)</version>',t):
+              if re.match(r'fabric-(rendering|key-binding|lifecycle-events|screen-api|command-api|resource-loader|client-gametest|api-base|events-interaction|particles)',a): print(a,v)
+          PY
+          while read -r a v; do curl -sf "$B/$a/$v/$a-$v-sources.jar" -o "$a-sources.jar" || echo "fehlt $a $v" >> miss.txt; done < mods.txt
+          ls -la > ls.txt
+          git init -q -b logs && git config user.name actions && git config user.email actions@users.noreply.github.com
+          git add . && git commit -qm apisources
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" logs
