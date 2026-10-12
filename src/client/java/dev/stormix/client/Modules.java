@@ -3,7 +3,6 @@ package dev.stormix.client;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.mojang.blaze3d.platform.InputConstants;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalTime;
@@ -286,8 +285,8 @@ public final class Modules {
 
 			@Override
 			public void tick(Minecraft mc) {
-				boolean want = this.enabled && mc.player != null && mc.gui.screen() == null
-					&& InputConstants.isKeyDown(mc.getWindow(), 67);
+				boolean want = this.enabled && mc.player != null && Compat.screen(mc) == null
+					&& Compat.keyDown(mc, 67);
 				if (want && this.oldFov == null) {
 					this.oldFov = mc.options.fov().get();
 					mc.options.fov().set(30);

@@ -13,6 +13,8 @@ loom {
 	}
 }
 
+sourceSets.client.java.srcDir "src/compat/${project.compat}/java"
+
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"

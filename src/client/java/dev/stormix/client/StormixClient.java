@@ -1,6 +1,5 @@
 package dev.stormix.client;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
@@ -27,9 +26,9 @@ public class StormixClient implements ClientModInitializer {
 		});
 
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
-			boolean down = InputConstants.isKeyDown(mc.getWindow(), 344);
-			if (down && !lastShift && mc.player != null && mc.gui.screen() == null) {
-				mc.gui.setScreen(new MenuScreen());
+			boolean down = Compat.keyDown(mc, 344);
+			if (down && !lastShift && mc.player != null && Compat.screen(mc) == null) {
+				Compat.setScreen(mc, new MenuScreen());
 			}
 			lastShift = down;
 			for (HudModule m : Modules.ALL) {
